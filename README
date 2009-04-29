@@ -1,0 +1,129 @@
+EVENTFUL SPINOFF 
+===========================
+This is a rewrite of the eventful system. Low profile. Just a component right now.
+
+INTERFACE
+===========================
+
+* @param string|array $events Use dot notation if you want. 
+* @param array $data (optional) Any data to pass along
+
+$results = $this->Event->triggerEvent($events = string|array, $data = array);
+
+# Valid event names:
+---------------------
+doSomething          // fire _onDoSomething in all controllers
+Global.doSomething   // fire _onDoSomething in all controllers
+Users.doSomething    // only fire UsersController::_onDoSomething()
+
+# Data param
+---------------------
+Assoc array. Passed directly into the Event Object which is the first argument
+when the event method is called. 
+
+$this->Event->triggerEvent('doSomething', array('hello' => 'world'));
+
+Now the handler receives the event object with a "hello" property.
+
+function _onDoSomething($event) {
+   echo $event->hello; // = 'world'
+   echo $event->name; // = 'doSomething'
+}
+
+The "name" property is added by default. 
+
+# Handler Params
+-----------------------
+By design every on-method receives to arguments: $event and $controller
+
+ * $event is as explained: just a object with some data.
+ * $controller is the instance of the controller that called "triggerEvent"
+
+Example: If you have a global handler in UsersController AND PostsController and you trigger
+this global event from Posts the handler in UsersController would receive the PostsController
+object in $controller.
+
+class UsersController extends AppController {
+  function _onMyEvent($event, $controller) {
+     echo $this->name // 'Users'
+     echo $controller->name // 'Posts' - as in: triggered from PostsController
+  }
+}
+
+
+# Return Value
+-----------------------
+Trigger Event returns a organized array which contains the return value of the event handler
+
+Array
+(
+    [Global] => Array  // <<< that's the scope (dot notation)
+        (
+            [test] => Array  // <<< that's the event name (as passed to the trigger method)
+                (
+                    [PagesController] => // here's whatever is returned by the "on" method
+                                         // Array key indicates that the method is in PagesController
+                )
+
+        )
+
+    [Jaddas] => Array  // <<< Execute handler method in "JaddasController" only
+        (
+            [local] => Array  // <<< _onLocal() was requested, found and executed.
+                (
+                    [JaddasController] => Jaddas.onLocal called! - Event: local - Controller: Jaddas
+                      
+                                      // see function body below (return..)
+                )
+
+        )
+
+)
+
+
+
+EXAMPLE CONTROLLERS
+===========================
+
+class JaddasController extends AppController {
+	var $helpers = array('Html');
+	var $uses = array();
+	var $name = 'Jaddas';
+	
+	var $components = array('Event');
+	
+	function index() {
+		pr ($this->Event->triggerEvent(array('Global.test', 'Jaddas.local', 'Somethings.local)));
+		exit;	
+	}
+
+	function _onLocal($event, $controller) {
+		return 'Jaddas.onLocal called! - Event: '.$event->name.' - Controller: '.$this->name;
+	}
+	
+	function _onTest($event, $controller) {
+		return 'Jaddas.onTest called! - Event: '.$event->name.' - Controller: '.$this->name;
+	}
+}
+
+class SomethingsController extends AppController {
+	var $helpers = array('Html');
+	var $uses = array();
+	var $name = 'Somethings';
+	
+	var $components = array('Event');
+
+	function index() {
+		pr ($this->Event->triggerEvent('testingThis'));
+		exit;
+	}
+
+	function _onTestingThis($event, $controller) {
+		return 'Somethings.onTestingThis called! - Event: '.$event->name.' - Controller: '.$this->name;
+	}
+	
+	function _onTest($event, $controller) {
+		return 'Somethings.onTest called! - Event: '.$event->name.' - Controller: '.$this->name;
+	}
+}
+
